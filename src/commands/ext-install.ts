@@ -367,7 +367,9 @@ async function installExtension(options: InstallExtensionOptions): Promise<void>
     let paramBindings: Record<string, string>;
     switch (choice) {
       case "installNew":
-        instanceId = await promptForValidInstanceId(`${instanceId}-${getRandomString(4)}`);
+        if (!options.extensionInstanceId) {
+          instanceId = await promptForValidInstanceId(`${instanceId}-${getRandomString(4)}`);
+        }
         paramBindingOptions = await paramHelper.getParams({
           projectId,
           paramSpecs: spec.params,
