@@ -43,6 +43,7 @@ import { previews } from "../previews";
 import { Options } from "../options";
 import * as manifest from "../extensions/manifest";
 import { getBaseParamBindings, ParamBindingOptions } from "../extensions/paramHelper";
+import extDevInit from "./ext-dev-init";
 
 marked.setOptions({
   renderer: new TerminalRenderer(),
@@ -62,6 +63,7 @@ export default new Command("ext:install [extensionName]")
   .withForce()
   // TODO(b/221037520): Deprecate the params flag then remove it in the next breaking version.
   .option("--params <paramsFile>", "name of params variables file with .env format.")
+  .option("--extensionInstanceId <extensionInstanceId>", "optionally set a specific instanceId to install or update.")
   .option("--local", "save to firebase.json rather than directly install to a Firebase project")
   .before(requirePermissions, ["firebaseextensions.instances.create"])
   .before(ensureExtensionsApiEnabled)
@@ -70,6 +72,7 @@ export default new Command("ext:install [extensionName]")
   .action(async (extensionName: string, options: Options) => {
     const projectId = getProjectId(options);
     const paramsEnvPath = (options.params ?? "") as string;
+    const extensionInstanceId = (options.extensionInstanceId ?? undefined) as string;
     let learnMore = false;
     if (!extensionName) {
       if (options.interactive) {
@@ -152,6 +155,7 @@ export default new Command("ext:install [extensionName]")
           paramsEnvPath,
           projectId,
           extensionName,
+          extensionInstanceId,
           source,
           extVersion: extensionVersion,
           nonInteractive: options.nonInteractive,
@@ -176,6 +180,7 @@ export default new Command("ext:install [extensionName]")
         paramsEnvPath,
         projectId: projectId,
         extensionName,
+        extensionInstanceId,
         source,
         extVersion: extensionVersion,
         nonInteractive: options.nonInteractive,
@@ -209,6 +214,7 @@ interface InstallExtensionOptions {
   paramsEnvPath?: string;
   projectId?: string;
   extensionName: string;
+  extensionInstanceId: string;
   source?: extensionsApi.ExtensionSource;
   extVersion?: extensionsApi.ExtensionVersion;
   nonInteractive: boolean;
@@ -235,7 +241,7 @@ async function installToManifest(options: InstallExtensionOptions): Promise<void
 
   const config = manifest.loadConfig(options);
 
-  let instanceId = spec.name;
+  let instanceId = options.extensionInstanceId ?? spec.name;
   while (manifest.instanceExists(instanceId, config)) {
     instanceId = await promptForValidInstanceId(`${spec.name}-${getRandomString(4)}`);
   }
@@ -280,6 +286,7 @@ async function installExtension(options: InstallExtensionOptions): Promise<void>
   const projectId = needProjectId({ projectId: options.projectId });
 
   const spec = source?.spec || extVersion?.spec;
+
   if (!spec) {
     throw new FirebaseError(
       `Could not find the extension.yaml for ${extensionName}. Please make sure this is a valid extension and try again.`
@@ -336,7 +343,7 @@ async function installExtension(options: InstallExtensionOptions): Promise<void>
         );
       }
     }
-    let instanceId = spec.name;
+    let instanceId = options.extensionInstanceId ?? spec.name;
 
     let choice: "updateExisting" | "installNew" | "cancel";
     const anotherInstanceExists = await instanceIdExists(projectId, instanceId);
